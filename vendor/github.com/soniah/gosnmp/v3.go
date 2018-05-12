@@ -1,6 +1,6 @@
 package gosnmp
 
-// Copyright 2012-2016 The GoSNMP Authors. All rights reserved.  Use of this
+// Copyright 2012-2018 The GoSNMP Authors. All rights reserved.  Use of this
 // source code is governed by a BSD-style license that can be found in the
 // LICENSE file.
 
@@ -35,6 +35,7 @@ const (
 
 // SnmpV3SecurityParameters is a generic interface type to contain various implementations of SnmpV3SecurityParameters
 type SnmpV3SecurityParameters interface {
+	Log()
 	Copy() SnmpV3SecurityParameters
 	validate(flags SnmpV3MsgFlags) error
 	init(log Logger) error
@@ -344,6 +345,10 @@ func (x *GoSNMP) unmarshalV3Header(packet []byte,
 	}
 	_, cursorTmp = parseLength(packet[cursor:])
 	cursor += cursorTmp
+
+	if response.SecurityParameters == nil {
+		return 0, fmt.Errorf("Unable to parse V3 packet - unknown security model")
+	}
 
 	cursor, err = response.SecurityParameters.unmarshal(response.MsgFlags, packet, cursor)
 	if err != nil {

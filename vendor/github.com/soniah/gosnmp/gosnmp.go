@@ -1,4 +1,4 @@
-// Copyright 2012-2016 The GoSNMP Authors. All rights reserved.  Use of this
+// Copyright 2012-2018 The GoSNMP Authors. All rights reserved.  Use of this
 // source code is governed by a BSD-style license that can be found in the
 // LICENSE file.
 
@@ -69,6 +69,9 @@ type GoSNMP struct {
 	MaxOids int
 
 	// MaxRepetitions sets the GETBULK max-repetitions used by BulkWalk*
+	// Unless MaxRepetitions is specified it will use defaultMaxRepetitions (50)
+	// This may cause issues with some devices, if so set MaxRepetitions lower.
+	// See comments in https://github.com/soniah/gosnmp/issues/100
 	MaxRepetitions uint8
 
 	// NonRepeaters sets the GETBULK max-repeaters used by BulkWalk*
@@ -112,7 +115,6 @@ var Default = &GoSNMP{
 
 // SnmpPDU will be used when doing SNMP Set's
 type SnmpPDU struct {
-
 	// Name is an oid in string format eg ".1.3.6.1.4.9.27"
 	Name string
 
@@ -127,15 +129,18 @@ type SnmpPDU struct {
 	Logger Logger
 }
 
+// AsnExtensionID mask to identify types > 30 in subsequent byte
+const AsnExtensionID = 0x1F
+
 // Asn1BER is the type of the SNMP PDU
 type Asn1BER byte
 
 // Asn1BER's - http://www.ietf.org/rfc/rfc1442.txt
 const (
 	EndOfContents     Asn1BER = 0x00
-	UnknownType               = 0x00 // TODO these should all be type Asn1BER, however
-	Boolean                   = 0x01 // tests fail if implemented. See for example
-	Integer                   = 0x02 /// http://stackoverflow.com/questions/5037610/typed-constant-declaration-list.
+	UnknownType               = 0x00
+	Boolean                   = 0x01
+	Integer                   = 0x02
 	BitString                 = 0x03
 	OctetString               = 0x04
 	Null                      = 0x05
@@ -149,6 +154,8 @@ const (
 	NsapAddress               = 0x45
 	Counter64                 = 0x46
 	Uinteger32                = 0x47
+	OpaqueFloat               = 0x78
+	OpaqueDouble              = 0x79
 	NoSuchObject              = 0x80
 	NoSuchInstance            = 0x81
 	EndOfMibView              = 0x82
@@ -290,7 +297,8 @@ func (x *GoSNMP) Get(oids []string) (result *SnmpPacket, err error) {
 func (x *GoSNMP) Set(pdus []SnmpPDU) (result *SnmpPacket, err error) {
 	var packetOut *SnmpPacket
 	switch pdus[0].Type {
-	case Integer, OctetString:
+	// TODO test Gauge32
+	case Integer, OctetString, Gauge32:
 		packetOut = x.mkSnmpPacket(SetRequest, pdus, 0, 0)
 	default:
 		return nil, fmt.Errorf("ERR:gosnmp currently only supports SNMP SETs for Integers and OctetStrings")
